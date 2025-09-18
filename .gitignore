@@ -1,0 +1,29 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# IntelliJ / VSCode
+.idea/
+.vscode/
+*.iml
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+android/app/google-services.json
+
+# iOS
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/Runner/GoogleService-Info.plist
+
+# Firebase config (Dart)
+lib/firebase_options.dart
+
+# Other
+*.log
