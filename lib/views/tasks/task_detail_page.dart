@@ -207,7 +207,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           onPressed: () async {
-            final users = await userService.fetchAllUsers();
+            final users = await userService.fetchOtherActiveUsers();
 
             final selected = await showDialog<Map<String, dynamic>>(
               context: context,

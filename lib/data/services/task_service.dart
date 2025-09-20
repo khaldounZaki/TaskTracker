@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/task_model.dart';
 import '../models/subtask_model.dart';
 import '../../utils/constants.dart';
+import 'package:rxdart/rxdart.dart';
 
 class TaskService extends ChangeNotifier {
   final FirebaseFirestore _fs = FirebaseFirestore.instance;
@@ -110,51 +111,63 @@ class TaskService extends ChangeNotifier {
         .map((snap) => snap.docs.map((d) => TaskModel.fromDoc(d)).toList());
   }
 
-  Stream<List<TaskModel>> streamTasksAssignedTo(String uid) async* {
-    final subStream = _fs
+  Stream<List<TaskModel>> streamTasksAssignedTo(String uid) {
+    return _fs
         .collectionGroup(COL_SUBTASKS)
         .where('toUser', isEqualTo: uid)
-        .snapshots();
+        .snapshots()
+        .switchMap((subSnap) {
+          final taskRefs = subSnap.docs
+              .map((d) => d.reference.parent.parent)
+              .whereType<DocumentReference>()
+              .toSet()
+              .toList();
 
-    await for (final subSnap in subStream) {
-      final taskIdSet = <String>{};
-      for (final doc in subSnap.docs) {
-        final parentTaskRef = doc.reference.parent.parent;
-        if (parentTaskRef != null) taskIdSet.add(parentTaskRef.id);
-      }
+          if (taskRefs.isEmpty) {
+            return Stream.value([]);
+          }
 
-      final tasks = <TaskModel>[];
-      for (final taskId in taskIdSet) {
-        final taskDocRef = _fs.collection(COL_TASKS).doc(taskId);
-        final taskDoc = await taskDocRef.get();
-        if (!taskDoc.exists) continue;
+          // merge multiple task streams into one list
+          return Rx.combineLatestList(
+            taskRefs.map((taskRef) {
+              // 👇 real-time task doc
+              final taskStream = taskRef.snapshots().map((doc) {
+                if (!doc.exists) return null;
+                return TaskModel.fromDoc(doc);
+              });
 
-        final task = TaskModel.fromDoc(taskDoc);
+              // 👇 real-time subtasks for this task
+              final subStream = taskRef
+                  .collection(COL_SUBTASKS)
+                  .orderBy('createdAt')
+                  .snapshots()
+                  .map(
+                    (snap) => snap.docs
+                        .map((d) => SubtaskModel.fromDoc(d))
+                        .where((s) => s.fromUser == uid || s.toUser == uid)
+                        .toList(),
+                  );
 
-        final subsSnap = await taskDocRef
-            .collection(COL_SUBTASKS)
-            .orderBy('createdAt', descending: false)
-            .get();
+              return Rx.combineLatest2(taskStream, subStream, (
+                TaskModel? task,
+                List<SubtaskModel> subs,
+              ) {
+                if (task == null || subs.isEmpty) return null;
+                return task.copyWith(subtasks: subs);
+              });
+            }),
+          ).map((tasks) {
+            final nonNull = tasks.whereType<TaskModel>().toList();
 
-        final subs = subsSnap.docs
-            .map((d) => SubtaskModel.fromDoc(d))
-            .where((s) => s.fromUser == uid || s.toUser == uid)
-            .toList();
+            nonNull.sort((a, b) {
+              final aDate = a.lastActivity ?? a.updatedAt ?? a.createdAt;
+              final bDate = b.lastActivity ?? b.updatedAt ?? b.createdAt;
+              return bDate.compareTo(aDate);
+            });
 
-        if (subs.isNotEmpty) {
-          tasks.add(task.copyWith(subtasks: subs));
-        }
-      }
-
-      // ✅ sort by lastActivity instead of createdAt
-      tasks.sort((a, b) {
-        final aDate = a.lastActivity ?? a.updatedAt ?? a.createdAt;
-        final bDate = b.lastActivity ?? b.updatedAt ?? b.createdAt;
-        return bDate.compareTo(aDate);
-      });
-
-      yield tasks;
-    }
+            return nonNull;
+          });
+        });
   }
 
   Stream<TaskModel?> streamTask(String taskId) {

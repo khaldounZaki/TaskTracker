@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/user_model.dart';
@@ -6,6 +7,7 @@ import '../../utils/constants.dart';
 
 class UserService extends ChangeNotifier {
   final FirebaseFirestore _fs = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   //print((snap.docs.map((d) => AppUser.fromDoc(d)).toList()));
   Stream<List<AppUser>> streamAllUsers() {
@@ -18,6 +20,21 @@ class UserService extends ChangeNotifier {
   Future<List<AppUser>> fetchAllUsers() async {
     final snap = await _fs.collection(COL_USERS).get();
     return snap.docs.map((d) => AppUser.fromDoc(d)).toList();
+  }
+
+  Future<List<AppUser>> fetchOtherActiveUsers() async {
+    final currentUid = _auth.currentUser?.uid;
+
+    final snap = await _fs
+        .collection(COL_USERS)
+        .where("active", isEqualTo: true)
+        .get();
+    print(snap.docs);
+
+    return snap.docs
+        .map((d) => AppUser.fromDoc(d))
+        .where((u) => u.uid != currentUid) // ✅ exclude self
+        .toList();
   }
 
   // Future<List<AppUser>> futureAllUsers() async {
