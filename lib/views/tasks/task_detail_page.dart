@@ -159,6 +159,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         padding: const EdgeInsets.all(8),
                         itemCount: subs.length,
                         itemBuilder: (context, i) => SubtaskCard(
+                          taskId: widget.taskId!,
                           subtask: subs[i],
                           onComplete: subs[i].status == 'pending'
                               ? () async {
