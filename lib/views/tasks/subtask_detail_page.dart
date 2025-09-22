@@ -5,8 +5,10 @@ import 'package:intl/intl.dart';
 
 import '../../../data/models/subtask_model.dart';
 import '../../../data/models/user_model.dart';
+
 import '../../../data/services/auth_service.dart';
 import '../../../utils/theme.dart';
+import '../../data/services/notification_service.dart';
 
 class SubtaskDetailPage extends StatefulWidget {
   final String taskId; // ✅ parent task ID
@@ -90,6 +92,13 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
 
       // ✅ Call UI callback if passed
       //widget.onComplete?.call();
+      await NotificationService().sendNotification(
+        toUser: widget.subtask.fromUser,
+        title: "Subtask Completed",
+        body: "User ${widget.subtask.toUser} finished a subtask.",
+        taskId: widget.taskId,
+        subtaskId: widget.subtask.id,
+      );
 
       if (mounted) Navigator.pop(context);
     } catch (e) {

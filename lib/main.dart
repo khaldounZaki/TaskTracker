@@ -21,7 +21,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => TaskService()),
         // NotificationService is not a ChangeNotifier because it exposes a stream
         // of incoming messages and handles token registration.
-        Provider(create: (_) => NotificationService()..init()),
+        //Provider(create: (_) => NotificationService()..init()),
       ],
       child: const MyApp(),
     ),

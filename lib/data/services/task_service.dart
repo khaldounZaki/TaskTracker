@@ -7,9 +7,11 @@ import '../models/task_model.dart';
 import '../models/subtask_model.dart';
 import '../../utils/constants.dart';
 import 'package:rxdart/rxdart.dart';
+import 'notification_service.dart';
 
 class TaskService extends ChangeNotifier {
   final FirebaseFirestore _fs = FirebaseFirestore.instance;
+  final NotificationService _notif = NotificationService();
 
   // Create main task
   Future<String> createTask({
@@ -41,7 +43,7 @@ class TaskService extends ChangeNotifier {
         .collection(COL_TASKS)
         .doc(taskId)
         .collection(COL_SUBTASKS);
-    await subcol.add({
+    final docRef = await subcol.add({
       'fromUser': fromUser,
       'toUser': toUser,
       'description': description,
@@ -56,6 +58,15 @@ class TaskService extends ChangeNotifier {
       'updatedAt': FieldValue.serverTimestamp(),
       'lastActivity': FieldValue.serverTimestamp(), // ✅
     });
+
+    // ✅ send notification to the assigned user
+    await _notif.sendNotification(
+      toUser: toUser,
+      title: "New Subtask Assigned",
+      body: "You have been assigned: $description",
+      taskId: taskId,
+      subtaskId: docRef.id,
+    );
     notifyListeners();
   }
 
@@ -64,6 +75,8 @@ class TaskService extends ChangeNotifier {
     required String taskId,
     required String subtaskId,
     required String result,
+    required String fromUser,
+    required String toUser,
   }) async {
     final subRef = _fs
         .collection(COL_TASKS)
@@ -98,6 +111,15 @@ class TaskService extends ChangeNotifier {
     }
 
     await _fs.collection(COL_TASKS).doc(taskId).update(parentUpdate);
+
+    // ✅ notify the creator (fromUser) that assignee finished
+    await _notif.sendNotification(
+      toUser: fromUser,
+      title: "Subtask Completed",
+      body: "User $toUser finished a subtask.",
+      taskId: taskId,
+      subtaskId: subtaskId,
+    );
     notifyListeners();
   }
 

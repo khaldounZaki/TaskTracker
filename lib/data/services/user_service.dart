@@ -12,7 +12,6 @@ class UserService extends ChangeNotifier {
   //print((snap.docs.map((d) => AppUser.fromDoc(d)).toList()));
   Stream<List<AppUser>> streamAllUsers() {
     return _fs.collection(COL_USERS).snapshots().map((snap) {
-      print((snap.docs.map((d) => AppUser.fromDoc(d)).toList()));
       return snap.docs.map((d) => AppUser.fromDoc(d)).toList();
     });
   }

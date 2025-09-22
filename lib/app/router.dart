@@ -7,6 +7,7 @@ import '../views/dashboard/dashboard_page.dart';
 import '../views/tasks/task_detail_page.dart';
 import '../views/tasks/add_task_page.dart';
 import '../views/admin/user_management_page.dart';
+import '../views/notification/notification_page.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -28,6 +29,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AddTaskPage());
       case '/admin-users':
         return MaterialPageRoute(builder: (_) => const UserManagementPage());
+      case '/notifications':
+        return MaterialPageRoute(builder: (_) => const NotificationsPage());
       default:
         return MaterialPageRoute(
           builder: (_) =>

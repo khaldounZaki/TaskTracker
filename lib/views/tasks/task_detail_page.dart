@@ -173,6 +173,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                     taskId: taskId,
                                     subtaskId: subs[i].id,
                                     result: result,
+                                    fromUser: subs[i].fromUser,
+                                    toUser: subs[i].toUser,
                                   );
                                   showSuccess(context, 'Subtask marked done');
                                 }

@@ -5,9 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../data/services/auth_service.dart';
 import '../../data/services/task_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../data/models/task_model.dart';
 import 'widgets/task_card.dart';
-import '../../utils/theme.dart'; // AppTheme
+import '../../utils/theme.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -111,6 +112,44 @@ class _DashboardPageState extends State<DashboardPage>
                         onPressed: () =>
                             Navigator.pushNamed(context, '/admin-users'),
                       ),
+                      IconButton(
+                        icon: Stack(
+                          children: [
+                            const Icon(
+                              Icons.notifications,
+                              color: Colors.white,
+                            ),
+                            StreamBuilder<List<Map<String, dynamic>>>(
+                              stream: NotificationService().streamNotifications(
+                                uid,
+                              ),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) return const SizedBox();
+                                final unreadCount = snapshot.data!
+                                    .where((n) => n['isRead'] == false)
+                                    .length;
+                                if (unreadCount == 0) return const SizedBox();
+                                return Positioned(
+                                  right: 0,
+                                  child: CircleAvatar(
+                                    radius: 8,
+                                    backgroundColor: Colors.red,
+                                    child: Text(
+                                      unreadCount.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/notifications'),
+                      ),
                     ],
                   ),
                 ),
@@ -129,9 +168,56 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.white70,
-                  tabs: const [
-                    Tab(text: 'My Tasks'),
-                    Tab(text: 'Assigned to Me'),
+                  tabs: [
+                    const Tab(text: 'My Tasks'),
+                    // 👇 Dynamic counter on "Assigned to Me"
+                    StreamBuilder<List<TaskModel>>(
+                      stream: Provider.of<TaskService>(
+                        context,
+                        listen: false,
+                      ).streamTasksAssignedTo(uid),
+                      builder: (context, snap) {
+                        int pendingCount = 0;
+                        if (snap.hasData) {
+                          for (final t in snap.data!) {
+                            pendingCount += t.subtasks
+                                .where(
+                                  (s) => s.toUser == uid && s.status != 'done',
+                                )
+                                .length;
+                          }
+                        }
+                        return Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text("Assigned to Me"),
+                              if (pendingCount > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    "$pendingCount",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ],
