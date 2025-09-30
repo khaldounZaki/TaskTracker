@@ -91,7 +91,7 @@ class TaskCard extends StatelessWidget {
                       .where((s) => s.status == 'pending' && s.toUser == uid)
                       .length;
                   final pendingToOthers = subs
-                      .where((s) => s.status == 'pending' && s.fromUser == uid)
+                      .where((s) => s.status == 'pending' && s.toUser != uid)
                       .length;
                   final completed = subs
                       .where((s) => s.status == 'done')

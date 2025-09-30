@@ -318,40 +318,39 @@ class _DashboardPageState extends State<DashboardPage>
           ),
 
           // Optional: quick chips (small) for status — shows which is active at a glance
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _statuses.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final s = _statuses[i];
-                  final label = s == 'all'
-                      ? 'All'
-                      : (s == 'in-progress' ? 'In-Progress' : s.capitalize());
-                  final bool selected = _statusFilter == s;
-                  return ChoiceChip(
-                    label: Text(label),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _statusFilter = s),
-                    selectedColor: AppTheme.button,
-                    backgroundColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color: selected ? AppTheme.buttonText : AppTheme.title,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-
+          // Padding(
+          //   padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          //   child: SizedBox(
+          //     height: 36,
+          //     child: ListView.separated(
+          //       scrollDirection: Axis.horizontal,
+          //       itemCount: _statuses.length,
+          //       separatorBuilder: (_, __) => const SizedBox(width: 8),
+          //       itemBuilder: (context, i) {
+          //         final s = _statuses[i];
+          //         final label = s == 'all'
+          //             ? 'All'
+          //             : (s == 'in-progress' ? 'In-Progress' : s.capitalize());
+          //         final bool selected = _statusFilter == s;
+          //         return ChoiceChip(
+          //           label: Text(label),
+          //           selected: selected,
+          //           onSelected: (_) => setState(() => _statusFilter = s),
+          //           selectedColor: AppTheme.button,
+          //           backgroundColor: Colors.white,
+          //           labelStyle: TextStyle(
+          //             color: selected ? AppTheme.buttonText : AppTheme.title,
+          //             fontWeight: FontWeight.w600,
+          //           ),
+          //           padding: const EdgeInsets.symmetric(
+          //             horizontal: 12,
+          //             vertical: 6,
+          //           ),
+          //         );
+          //       },
+          //     ),
+          //   ),
+          // ),
           const SizedBox(height: 8),
 
           // Tab views

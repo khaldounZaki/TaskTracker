@@ -9,6 +9,7 @@ class NotificationService {
     required String body,
     required String taskId,
     required String subtaskId,
+    required String fromUser,
   }) async {
     await _fs.collection('users').doc(toUser).collection('notifications').add({
       "title": title,
@@ -16,6 +17,7 @@ class NotificationService {
       "taskId": taskId,
       "subtaskId": subtaskId,
       "isRead": false,
+      "fromUser": fromUser,
       "createdAt": FieldValue.serverTimestamp(),
     });
   }

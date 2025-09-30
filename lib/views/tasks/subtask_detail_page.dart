@@ -3,15 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import '../../../data/models/task_model.dart';
 import '../../../data/models/subtask_model.dart';
 import '../../../data/models/user_model.dart';
-
 import '../../../data/services/auth_service.dart';
 import '../../../utils/theme.dart';
 import '../../data/services/notification_service.dart';
 
 class SubtaskDetailPage extends StatefulWidget {
-  final String taskId; // ✅ parent task ID
+  final String taskId;
   final SubtaskModel subtask;
   final VoidCallback? onComplete;
 
@@ -37,6 +37,14 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         .map((doc) => doc.exists ? AppUser.fromDoc(doc) : null);
   }
 
+  Stream<TaskModel?> _streamTask(String taskId) {
+    return FirebaseFirestore.instance
+        .collection('tasks')
+        .doc(taskId)
+        .snapshots()
+        .map((doc) => doc.exists ? TaskModel.fromDoc(doc) : null);
+  }
+
   String _formatDate(dynamic ts) {
     if (ts == null) return "N/A";
     if (ts is Timestamp) {
@@ -54,6 +62,8 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         return Colors.green;
       case 'pending':
         return AppTheme.button;
+      case 'in-progress':
+        return Colors.orange;
       default:
         return AppTheme.subtitle;
     }
@@ -65,39 +75,30 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
           .collection("tasks")
           .doc(widget.taskId);
 
-      // ✅ Update subtask
       await taskRef.collection("subtasks").doc(widget.subtask.id).update({
         "status": "done",
         "result": _resultController.text.trim(),
         "completedAt": Timestamp.now(),
       });
 
-      // ✅ Check if all subtasks are done
       final subsSnap = await taskRef.collection("subtasks").get();
       final allDone = subsSnap.docs.every((doc) => doc["status"] == "done");
 
-      if (allDone) {
-        await taskRef.update({
-          "status": "done",
-          'updatedAt': FieldValue.serverTimestamp(),
-          'lastActivity': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await taskRef.update({
-          "status": "in-progress",
-          'updatedAt': FieldValue.serverTimestamp(),
-          'lastActivity': FieldValue.serverTimestamp(),
-        }); // optional: keep synced
-      }
+      await taskRef.update({
+        "status": allDone ? "done" : "in-progress",
+        'updatedAt': FieldValue.serverTimestamp(),
+        'lastActivity': FieldValue.serverTimestamp(),
+      });
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final currentUid = auth.currentUser?.uid;
 
-      // ✅ Call UI callback if passed
-      //widget.onComplete?.call();
       await NotificationService().sendNotification(
         toUser: widget.subtask.fromUser,
         title: "Subtask Completed",
         body: "User ${widget.subtask.toUser} finished a subtask.",
         taskId: widget.taskId,
         subtaskId: widget.subtask.id,
+        fromUser: currentUid ?? '',
       );
 
       if (mounted) Navigator.pop(context);
@@ -131,119 +132,146 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Description ---
-            Text(
-              widget.subtask.description,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.title,
+            // --- MAIN TASK INFO ---
+            _buildSectionTitle("Main Task"),
+            StreamBuilder<TaskModel?>(
+              stream: _streamTask(widget.taskId),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final task = snapshot.data!;
+                return _buildInfoCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.title,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        task.description,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.subtitle,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            // --- SUBTASK INFO ---
+            _buildSectionTitle("Subtask"),
+            _buildInfoCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.subtask.description,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.subtitle,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Chip(
+                    backgroundColor: _statusColor(widget.subtask.status),
+                    label: Text(
+                      widget.subtask.status.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
 
-            // --- Status Chip ---
-            Chip(
-              backgroundColor: _statusColor(widget.subtask.status),
-              label: Text(
-                widget.subtask.status.toUpperCase(),
-                style: const TextStyle(
-                  color: AppTheme.buttonText,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const Divider(height: 30),
-
-            // --- From → To ---
-            Row(
-              children: [
-                Expanded(
-                  child: StreamBuilder<AppUser?>(
+            // --- ASSIGNMENT INFO ---
+            _buildSectionTitle("Assignment"),
+            _buildInfoCard(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  StreamBuilder<AppUser?>(
                     stream: _streamUser(widget.subtask.fromUser),
                     builder: (context, snapshot) {
-                      String fromName = snapshot.hasData
+                      final fromName = snapshot.hasData
                           ? snapshot.data!.name
                           : "Unknown";
-                      return Text(
-                        "From: $fromName",
-                        style: const TextStyle(fontSize: 16),
-                      );
+                      return Text("From: $fromName");
                     },
                   ),
-                ),
-                const Icon(Icons.arrow_right_alt, color: AppTheme.subtitle),
-                Expanded(
-                  child: StreamBuilder<AppUser?>(
+                  StreamBuilder<AppUser?>(
                     stream: _streamUser(widget.subtask.toUser),
                     builder: (context, snapshot) {
-                      String toName = snapshot.hasData
+                      final toName = snapshot.hasData
                           ? snapshot.data!.name
                           : "Unknown";
-                      return Text(
-                        "To: $toName",
-                        style: const TextStyle(fontSize: 16),
-                      );
+                      return Text("To: $toName");
                     },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // --- Dates ---
-            Text(
-              "Created: ${_formatDate(widget.subtask.createdAt)}",
-              style: const TextStyle(color: AppTheme.subtitle),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              "Completed: ${widget.subtask.completedAt != null ? _formatDate(widget.subtask.completedAt) : "Not yet"}",
-              style: const TextStyle(color: AppTheme.subtitle),
-            ),
-            const Divider(height: 30),
-
-            // --- Result ---
-            Text(
-              "Result",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-
-            if (widget.subtask.status == 'pending' &&
-                widget.subtask.toUser == currentUid)
-              TextField(
-                controller: _resultController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: "Enter result here...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                ),
-              )
-            else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Text(
-                  widget.subtask.result.isEmpty
-                      ? "No result yet."
-                      : widget.subtask.result,
-                  style: const TextStyle(fontSize: 15),
-                ),
+                ],
               ),
+            ),
 
-            const SizedBox(height: 30),
+            // --- TIMELINE ---
+            _buildSectionTitle("Timeline"),
+            _buildInfoCard(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Created: ${_formatDate(widget.subtask.createdAt)}"),
+                  Text(
+                    widget.subtask.completedAt != null
+                        ? "Completed: ${_formatDate(widget.subtask.completedAt)}"
+                        : "Not completed",
+                  ),
+                ],
+              ),
+            ),
 
-            // --- Action Button ---
+            // --- RESULT ---
+            _buildSectionTitle("Result"),
+            _buildInfoCard(
+              child:
+                  widget.subtask.status == 'pending' &&
+                      widget.subtask.toUser == currentUid
+                  ? TextField(
+                      controller: _resultController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: "Enter result here...",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                      ),
+                    )
+                  : Text(
+                      widget.subtask.result.isEmpty
+                          ? "No result yet."
+                          : widget.subtask.result,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppTheme.subtitle,
+                      ),
+                    ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // --- ACTION BUTTON ---
             if (widget.subtask.status == 'pending' &&
                 widget.subtask.toUser == currentUid)
               SizedBox(
@@ -251,18 +279,18 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.button,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _markAsDone,
                   child: const Text(
                     "Mark as Done",
                     style: TextStyle(
-                      color: AppTheme.buttonText,
-                      fontWeight: FontWeight.bold,
                       fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -270,6 +298,41 @@ class _SubtaskDetailPageState extends State<SubtaskDetailPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // --- UI HELPERS ---
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: AppTheme.title,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

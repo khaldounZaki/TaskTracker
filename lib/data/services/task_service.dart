@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-
+import 'package:provider/provider.dart';
+import '../../../data/services/auth_service.dart';
 import '../models/task_model.dart';
 import '../models/subtask_model.dart';
 import '../../utils/constants.dart';
@@ -60,12 +61,14 @@ class TaskService extends ChangeNotifier {
     });
 
     // ✅ send notification to the assigned user
+
     await _notif.sendNotification(
       toUser: toUser,
       title: "New Subtask Assigned",
       body: "You have been assigned: $description",
       taskId: taskId,
       subtaskId: docRef.id,
+      fromUser: fromUser,
     );
     notifyListeners();
   }
@@ -119,6 +122,7 @@ class TaskService extends ChangeNotifier {
       body: "User $toUser finished a subtask.",
       taskId: taskId,
       subtaskId: subtaskId,
+      fromUser: fromUser,
     );
     notifyListeners();
   }
